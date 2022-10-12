@@ -1,6 +1,12 @@
 name: Build IPQ807x for AX6
 on: [push]
-
+env:
+  REPO_URL: https://github.com/flyfishes/openwrt-robimarko
+  REPO_BRANCH: ipq807x-5.15-pr
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: ../../kernel-5.15/config/robimarko-ax6-5.15.config
+  TZ: Asia/Shanghai
+  
 jobs:
     build:
         name: Prepare and build IPQ807x generic images for AX6
@@ -10,10 +16,32 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v2
 
+            - name: Initialization environment
+              env:
+                DEBIAN_FRONTEND: noninteractive
+              run: |
+                sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+                sudo -E apt-get -qq update
+                sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-2004)
+                sudo -E apt-get -qq autoremove --purge
+                sudo -E apt-get -qq clean
+                sudo timedatectl set-timezone "$TZ"
+                sudo mkdir -p /workdir
+                sudo chown $USER:$GROUPS /workdir
+                
+            - name: Clone source code
+              working-directory: /workdir
+              run: |
+                df -hT $PWD
+                git clone $REPO_URL -b $REPO_BRANCH openwrt
+                ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwr
+
             - name: Update and install feeds
               run: |
-                ./scripts/feeds update -a
-                ./scripts/feeds install -a
+                cd openwrt && ./scripts/feeds update -a
+                cd openwrt && ./scripts/feeds install -a
+                
+              
             - name: Generate config for IPQ807x Generic
               run: |
                 echo "CONFIG_TARGET_ipq807x=y" > .config
@@ -29,26 +57,33 @@ jobs:
                 echo "CONFIG_PACKAGE_wpad-basic-wolfssl=m\n" >> .config
                 echo "CONFIG_PACKAGE_wpad-wolfssl=y\n" >> .config
                 echo "copy kernel-5.15/config/robimarko-ax6-5.15.config"
-                cp ../../kernel-5.15/config/robimarko-ax6-5.15.config .config
+                [ -e $CONFIG_FILE ] && cp $CONFIG_FILE openwrt/.config
+                cd openwrt 
                 cat .config
                 make defconfig
             - name: Download package sources
-              run: make download V=s
+              run: cd openwrt && make download V=s
 
             - name: Build tools
               run: |
+                cd openwrt 
                 make tools/install -j$(nproc) V=s || \
                 make tools/install V=s
             - name: Build toolchain
               run: |
+                cd openwrt 
                 make toolchain/install -j$(nproc) V=s || \
                 make toolchain/install V=s
             - name: Build target images
               run: |
+                cd openwrt 
                 make -j$(nproc) V=s || \
                 make V=s
             - name: TAR output
-              run: tar -cvf ipq807xx-images.tar bin/targets/ipq807x/generic
+              run: |
+                cd openwrt
+                tar -cvf ipq807xx-images.tar bin/targets/ipq807x/generic
+                cp ipq807xx-images.tar ../
 
             - name: Upload artifacts
               uses: actions/upload-artifact@v2
