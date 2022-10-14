@@ -4,7 +4,7 @@ env:
   REPO_URL: https://github.com/flyfishes/openwrt-robimarko
   REPO_BRANCH: ipq807x-5.15-pr
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: ../../kernel-5.15/config/robimarko-ax6-5.15.config
+  CONFIG_FILE: /kernel-5.15/config/robimarko-ax6-5.15.config
   TZ: Asia/Shanghai
   
 jobs:
